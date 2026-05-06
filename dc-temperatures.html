@@ -1,0 +1,908 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Washington DC Temperature History 1975–2026</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #1e2130;
+    --border: #2e3250;
+    --accent: #4f7cff;
+    --accent2: #ff6b6b;
+    --text: #e2e8f0;
+    --muted: #8892aa;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 24px 32px;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  header p {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-top: 4px;
+  }
+
+  main {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* Spinner */
+  #status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    padding: 48px 0;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  #status p { color: var(--muted); }
+
+  .error-msg {
+    background: #2d1b1b;
+    border: 1px solid #7f2b2b;
+    border-radius: 8px;
+    padding: 16px 20px;
+    color: #f87171;
+    text-align: center;
+  }
+
+  /* Chart section */
+  #chart-section { display: none; }
+
+  .toggle-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+
+  .toggle-row span {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-right: 4px;
+  }
+
+  .btn {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.85rem;
+    transition: all 0.15s;
+  }
+
+  .btn:hover { border-color: var(--accent); color: var(--text); }
+  .btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
+
+  .chart-wrap {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+  }
+
+  .chart-hint {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 10px;
+    text-align: right;
+  }
+
+  /* Analysis */
+  #analysis-section {
+    display: none;
+    margin-top: 40px;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-size: 0.78rem;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+
+  .card h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 12px;
+  }
+
+  .highlight {
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 6px 6px 0;
+    padding: 12px 16px;
+    margin: 12px 0;
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .highlight strong { color: var(--green); }
+  .highlight em { color: var(--yellow); font-style: normal; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+    margin-top: 12px;
+  }
+
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.78rem;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(46, 50, 80, 0.5);
+    color: var(--text);
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+
+  .rank-1 td:first-child { color: var(--yellow); font-weight: 700; }
+  .rank-2 td:first-child { color: var(--muted); }
+  .rank-3 td:first-child { color: #b87333; }
+
+  .q4-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+
+  .q4-controls label { color: var(--muted); font-size: 0.88rem; }
+
+  input[type="date"] {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 6px 12px;
+    font-size: 0.88rem;
+    cursor: pointer;
+  }
+
+  input[type="date"]:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  .z-score-block {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .z-stat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+
+  .z-stat .val {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--accent2);
+    display: block;
+  }
+
+  .z-stat .lbl {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 4px;
+    display: block;
+  }
+
+  ul.suggestions {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 4px;
+  }
+
+  ul.suggestions li {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  ul.suggestions li strong { color: var(--accent); }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 0.78rem;
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Washington DC Temperature History</h1>
+  <p>1975 – 2026 &nbsp;·&nbsp; Daily high/low data from Open-Meteo Historical Archive</p>
+</header>
+
+<main>
+
+  <!-- Loading / error -->
+  <div id="status">
+    <div class="spinner"></div>
+    <p>Fetching 50 years of temperature data…</p>
+  </div>
+
+  <!-- Chart -->
+  <section id="chart-section">
+    <div class="toggle-row">
+      <span>View:</span>
+      <button class="btn active" id="btn-yearly" onclick="switchView('yearly')">Yearly Avg</button>
+      <button class="btn" id="btn-monthly" onclick="switchView('monthly')">Monthly</button>
+      <button class="btn" id="btn-daily" onclick="switchView('daily')">Daily</button>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="resetZoom()">Reset zoom</button>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="mainChart" height="360"></canvas>
+    </div>
+    <p class="chart-hint">Scroll to zoom &nbsp;·&nbsp; Drag to pan</p>
+  </section>
+
+  <!-- Analysis -->
+  <section id="analysis-section">
+    <p class="section-title">Analysis</p>
+
+    <!-- Q1 -->
+    <div class="card">
+      <h2>Q1 — Have average temperatures changed?</h2>
+      <div id="q1-result" class="highlight"></div>
+    </div>
+
+    <!-- Q2 -->
+    <div class="card">
+      <h2>Q2 — How did temperatures change over time?</h2>
+      <div id="q2-result"></div>
+    </div>
+
+    <!-- Q3 -->
+    <div class="card">
+      <h2>Q3 — Abnormal days per season</h2>
+      <p style="color:var(--muted);font-size:0.85rem;margin-bottom:8px">Days outside ±2σ of the 50-year calendar-day mean. H = abnormally hot, L = abnormally cold.</p>
+      <div id="q3-result"></div>
+    </div>
+
+    <!-- Q4 -->
+    <div class="card">
+      <h2>Q4 — Hottest days on record for a given date</h2>
+      <div class="q4-controls">
+        <label for="datePicker">Pick a calendar date:</label>
+        <input type="date" id="datePicker" />
+      </div>
+      <div id="q4-result"></div>
+    </div>
+
+    <!-- Q5 -->
+    <div class="card">
+      <h2>Q5 — How abnormal was 93°F in April 2026?</h2>
+      <div id="q5-result"></div>
+    </div>
+
+    <!-- Suggestions -->
+    <div class="card">
+      <h2>Suggested Further Questions</h2>
+      <ul class="suggestions">
+        <li><strong>Heat wave trends</strong> — How many consecutive 90°F+ days per year? Is the streak length growing?</li>
+        <li><strong>First/last frost dates</strong> — When does the last freeze of spring occur? Has it shifted earlier?</li>
+        <li><strong>90°F+ day count per year</strong> — How many scorching days are we getting annually vs. the 1970s?</li>
+        <li><strong>Temperature swing</strong> — Has the daily range (max − min) narrowed over time (urban heat island effect)?</li>
+        <li><strong>Winter warm spells</strong> — How often does DC exceed 60°F in December–February?</li>
+        <li><strong>Record comparisons</strong> — What's the all-time hottest/coldest day, and when did it occur?</li>
+        <li><strong>Seasonal timing shift</strong> — Has summer (days above 85°F) started earlier or ended later?</li>
+      </ul>
+    </div>
+
+  </section>
+
+  <footer>
+    Data: <a href="https://open-meteo.com" target="_blank">Open-Meteo Historical Archive API</a> &nbsp;·&nbsp;
+    Washington DC (38.9072°N, 77.0369°W) &nbsp;·&nbsp; Temperature unit: °F
+  </footer>
+
+</main>
+
+<script>
+// ─── Data ───────────────────────────────────────────────────────────────────
+let dailyData = [];    // {date, year, month, dayOfYear, max, min, avg}
+let byYear    = {};    // year → {avg, max, min, count}
+let byMonth   = {};    // "YYYY-MM" → {avg, max, min, count}
+let byDayOfYear = {};  // 1–366 → {vals[], mean, sd}
+let bySeason  = {};    // year → {spring,summer,fall,winter} each {avg, highs, lows}
+
+// Chart
+let chart = null;
+let currentView = 'yearly';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function dayOfYear(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const start = new Date(d.getFullYear(), 0, 0);
+  return Math.floor((d - start) / 86400000);
+}
+
+function linReg(xs, ys) {
+  const n = xs.length;
+  const mx = xs.reduce((a,b) => a+b, 0) / n;
+  const my = ys.reduce((a,b) => a+b, 0) / n;
+  const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+  const den = xs.reduce((s, x) => s + (x - mx) ** 2, 0);
+  const slope = den === 0 ? 0 : num / den;
+  const intercept = my - slope * mx;
+  return { slope, intercept };
+}
+
+function mean(arr) {
+  return arr.reduce((a, b) => a + b, 0) / arr.length;
+}
+
+function stdDev(arr, m) {
+  const mu = m ?? mean(arr);
+  return Math.sqrt(arr.reduce((s, v) => s + (v - mu) ** 2, 0) / arr.length);
+}
+
+function season(month) {
+  if (month >= 3 && month <= 5) return 'spring';
+  if (month >= 6 && month <= 8) return 'summer';
+  if (month >= 9 && month <= 11) return 'fall';
+  return 'winter';
+}
+
+function fmt(n, dec = 1) { return n.toFixed(dec); }
+
+// ─── Fetch ────────────────────────────────────────────────────────────────────
+async function fetchData() {
+  const url = 'https://archive-api.open-meteo.com/v1/archive' +
+    '?latitude=38.9072&longitude=-77.0369' +
+    '&start_date=1975-01-01&end_date=2026-04-30' +
+    '&daily=temperature_2m_max,temperature_2m_min' +
+    '&temperature_unit=fahrenheit' +
+    '&timezone=America%2FNew_York';
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const json = await res.json();
+
+  const { time, temperature_2m_max: maxArr, temperature_2m_min: minArr } = json.daily;
+
+  // Build dailyData
+  dailyData = time.map((date, i) => {
+    const max = maxArr[i];
+    const min = minArr[i];
+    if (max == null || min == null) return null;
+    const avg = (max + min) / 2;
+    const d = new Date(date + 'T00:00:00');
+    const year  = d.getFullYear();
+    const month = d.getMonth() + 1; // 1-12
+    const doy   = dayOfYear(date);
+    return { date, year, month, dayOfYear: doy, max, min, avg };
+  }).filter(Boolean);
+
+  // byYear
+  dailyData.forEach(d => {
+    if (!byYear[d.year]) byYear[d.year] = { avgs: [], maxs: [], mins: [] };
+    byYear[d.year].avgs.push(d.avg);
+    byYear[d.year].maxs.push(d.max);
+    byYear[d.year].mins.push(d.min);
+  });
+  Object.keys(byYear).forEach(y => {
+    const b = byYear[y];
+    byYear[y] = {
+      avg: mean(b.avgs),
+      max: Math.max(...b.maxs),
+      min: Math.min(...b.mins),
+      avgMax: mean(b.maxs),
+      avgMin: mean(b.mins),
+      count: b.avgs.length
+    };
+  });
+
+  // byMonth
+  dailyData.forEach(d => {
+    const key = `${d.year}-${String(d.month).padStart(2,'0')}`;
+    if (!byMonth[key]) byMonth[key] = { avgs: [], maxs: [], mins: [] };
+    byMonth[key].avgs.push(d.avg);
+    byMonth[key].maxs.push(d.max);
+    byMonth[key].mins.push(d.min);
+  });
+  Object.keys(byMonth).forEach(k => {
+    const b = byMonth[k];
+    byMonth[k] = { avg: mean(b.avgs), max: Math.max(...b.maxs), min: Math.min(...b.mins) };
+  });
+
+  // byDayOfYear — skip leap day (doy 366) for simplicity
+  dailyData.forEach(d => {
+    if (d.dayOfYear > 365) return;
+    if (!byDayOfYear[d.dayOfYear]) byDayOfYear[d.dayOfYear] = { vals: [] };
+    byDayOfYear[d.dayOfYear].vals.push(d.avg);
+  });
+  Object.keys(byDayOfYear).forEach(doy => {
+    const vals = byDayOfYear[doy].vals;
+    const m = mean(vals);
+    byDayOfYear[doy] = { vals, mean: m, sd: stdDev(vals, m) };
+  });
+
+  // bySeason + abnormal day counts
+  dailyData.forEach(d => {
+    const doy = d.dayOfYear > 365 ? 365 : d.dayOfYear;
+    const ref = byDayOfYear[doy];
+    if (!ref) return;
+    const hi = d.avg > ref.mean + 2 * ref.sd;
+    const lo = d.avg < ref.mean - 2 * ref.sd;
+    const s = season(d.month);
+    // season year: winter belongs to year of Jan/Feb
+    const yr = (s === 'winter' && d.month >= 12) ? d.year + 1 : d.year;
+    if (!bySeason[yr]) bySeason[yr] = {
+      spring: {avgs:[],h:0,l:0}, summer: {avgs:[],h:0,l:0},
+      fall:   {avgs:[],h:0,l:0}, winter: {avgs:[],h:0,l:0}
+    };
+    bySeason[yr][s].avgs.push(d.avg);
+    if (hi) bySeason[yr][s].h++;
+    if (lo) bySeason[yr][s].l++;
+  });
+}
+
+// ─── Chart ────────────────────────────────────────────────────────────────────
+function buildYearlyDatasets() {
+  const years = Object.keys(byYear).map(Number).sort();
+  const avgs  = years.map(y => byYear[y].avg);
+  const { slope, intercept } = linReg(years, avgs);
+  const trend = years.map(y => slope * y + intercept);
+
+  return {
+    labels: years,
+    datasets: [
+      {
+        label: 'Annual Average Temp (°F)',
+        data: avgs,
+        borderColor: '#4f7cff',
+        backgroundColor: 'rgba(79,124,255,0.12)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        order: 2
+      },
+      {
+        label: 'Trend',
+        data: trend,
+        borderColor: '#ff6b6b',
+        borderDash: [6, 3],
+        pointRadius: 0,
+        tension: 0,
+        fill: false,
+        order: 1
+      }
+    ]
+  };
+}
+
+function buildMonthlyDatasets() {
+  const keys = Object.keys(byMonth).sort();
+  const labels = keys;
+  const avgs   = keys.map(k => byMonth[k].avg);
+  const xs = keys.map((_, i) => i);
+  const { slope, intercept } = linReg(xs, avgs);
+  const trend = xs.map(x => slope * x + intercept);
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Monthly Average Temp (°F)',
+        data: avgs,
+        borderColor: '#4f7cff',
+        backgroundColor: 'rgba(79,124,255,0.08)',
+        fill: true,
+        tension: 0.2,
+        pointRadius: 1,
+        pointHoverRadius: 5,
+        order: 2
+      },
+      {
+        label: 'Trend',
+        data: trend,
+        borderColor: '#ff6b6b',
+        borderDash: [6, 3],
+        pointRadius: 0,
+        fill: false,
+        order: 1
+      }
+    ]
+  };
+}
+
+function buildDailyDatasets() {
+  // Decimate to every 7th day for performance
+  const decimated = dailyData.filter((_, i) => i % 7 === 0);
+  return {
+    labels: decimated.map(d => d.date),
+    datasets: [{
+      label: 'Daily Average Temp (°F)',
+      data: decimated.map(d => d.avg),
+      borderColor: '#4f7cff',
+      backgroundColor: 'rgba(79,124,255,0.06)',
+      fill: true,
+      tension: 0.1,
+      pointRadius: 0,
+      borderWidth: 1,
+      order: 1
+    }]
+  };
+}
+
+function renderChart(view) {
+  const data = view === 'yearly' ? buildYearlyDatasets()
+             : view === 'monthly' ? buildMonthlyDatasets()
+             : buildDailyDatasets();
+
+  if (chart) {
+    chart.data = data;
+    chart.update('none');
+    return;
+  }
+
+  chart = new Chart(document.getElementById('mainChart'), {
+    type: 'line',
+    data,
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#8892aa', font: { size: 12 } }
+        },
+        tooltip: {
+          backgroundColor: '#1e2130',
+          borderColor: '#2e3250',
+          borderWidth: 1,
+          titleColor: '#e2e8f0',
+          bodyColor: '#8892aa',
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}°F`
+          }
+        },
+        zoom: {
+          pan: { enabled: true, mode: 'x' },
+          zoom: {
+            wheel: { enabled: true },
+            pinch: { enabled: true },
+            mode: 'x'
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#8892aa', maxTicksLimit: 12, maxRotation: 0 },
+          grid:  { color: 'rgba(46,50,80,0.5)' }
+        },
+        y: {
+          ticks: {
+            color: '#8892aa',
+            callback: v => v + '°F'
+          },
+          grid: { color: 'rgba(46,50,80,0.5)' }
+        }
+      }
+    }
+  });
+}
+
+function switchView(view) {
+  currentView = view;
+  ['yearly','monthly','daily'].forEach(v => {
+    document.getElementById(`btn-${v}`).classList.toggle('active', v === view);
+  });
+  renderChart(view);
+}
+
+function resetZoom() { chart && chart.resetZoom(); }
+
+// ─── Analysis ─────────────────────────────────────────────────────────────────
+
+function renderQ1() {
+  const years = Object.keys(byYear).map(Number).sort();
+  const avgs  = years.map(y => byYear[y].avg);
+  const { slope } = linReg(years, avgs);
+  const decadeChange = slope * 10;
+
+  const early = avgs.slice(0, 10);
+  const late  = avgs.slice(-10);
+  const earlyMean = mean(early);
+  const lateMean  = mean(late);
+
+  let html;
+  if (Math.abs(decadeChange) < 0.05) {
+    html = 'No statistically significant change detected over the 50-year period.';
+  } else {
+    const dir = decadeChange > 0 ? 'risen' : 'fallen';
+    html = `Yes — DC's average annual temperature has <strong>${dir} by ${fmt(Math.abs(decadeChange))}°F per decade</strong> since 1975
+      (from <em>${fmt(earlyMean)}°F</em> in the late 1970s to <em>${fmt(lateMean)}°F</em> in the early 2020s).`;
+  }
+  document.getElementById('q1-result').innerHTML = html;
+}
+
+function renderQ2() {
+  const decades = [
+    [1975,1984], [1985,1994], [1995,2004], [2005,2014], [2015,2024]
+  ];
+
+  let rows = '';
+  decades.forEach(([s, e]) => {
+    const yrs = Object.keys(byYear).map(Number).filter(y => y >= s && y <= e);
+    if (!yrs.length) return;
+    const avgT  = mean(yrs.map(y => byYear[y].avg));
+    const avgHi = mean(yrs.map(y => byYear[y].avgMax));
+    const avgLo = mean(yrs.map(y => byYear[y].avgMin));
+    rows += `<tr>
+      <td>${s}–${e}</td>
+      <td>${fmt(avgT)}°F</td>
+      <td>${fmt(avgHi)}°F</td>
+      <td>${fmt(avgLo)}°F</td>
+    </tr>`;
+  });
+
+  // Overall summer hi / winter lo comparison
+  const early = [1975,1984];
+  const late  = [2015,2024];
+  const earlyHi = mean(Object.keys(byYear).map(Number).filter(y => y >= early[0] && y <= early[1]).map(y => byYear[y].avgMax));
+  const lateHi  = mean(Object.keys(byYear).map(Number).filter(y => y >= late[0]  && y <= late[1]).map(y => byYear[y].avgMax));
+  const earlyLo = mean(Object.keys(byYear).map(Number).filter(y => y >= early[0] && y <= early[1]).map(y => byYear[y].avgMin));
+  const lateLo  = mean(Object.keys(byYear).map(Number).filter(y => y >= late[0]  && y <= late[1]).map(y => byYear[y].avgMin));
+
+  document.getElementById('q2-result').innerHTML = `
+    <div class="highlight">
+      Average daily highs are <strong>${fmt(lateHi - earlyHi, 1)}°F higher</strong> and
+      average daily lows are <strong>${fmt(lateLo - earlyLo, 1)}°F higher</strong> compared to the late 1970s.
+    </div>
+    <table>
+      <thead><tr>
+        <th>Decade</th><th>Avg Annual Temp</th><th>Avg Daily High</th><th>Avg Daily Low</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderQ3() {
+  const decades = [
+    [1975,1984,'1975–84'], [1985,1994,'1985–94'], [1995,2004,'1995–04'],
+    [2005,2014,'2005–14'], [2015,2024,'2015–24']
+  ];
+  const seas = ['spring','summer','fall','winter'];
+
+  let rows = '';
+  decades.forEach(([s, e, label]) => {
+    const yrs = Object.keys(bySeason).map(Number).filter(y => y >= s && y <= e);
+    const totals = {};
+    seas.forEach(se => totals[se] = { h: 0, l: 0 });
+    yrs.forEach(y => {
+      if (!bySeason[y]) return;
+      seas.forEach(se => {
+        totals[se].h += bySeason[y][se].h;
+        totals[se].l += bySeason[y][se].l;
+      });
+    });
+    rows += `<tr><td>${label}</td>${seas.map(se =>
+      `<td>${totals[se].h}H / ${totals[se].l}L</td>`
+    ).join('')}</tr>`;
+  });
+
+  document.getElementById('q3-result').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Decade</th><th>Spring</th><th>Summer</th><th>Fall</th><th>Winter</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderQ4(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const targetMonth = d.getMonth() + 1;
+  const targetDay   = d.getDate();
+
+  const matches = dailyData
+    .filter(r => {
+      const rd = new Date(r.date + 'T00:00:00');
+      return rd.getMonth() + 1 === targetMonth && rd.getDate() === targetDay;
+    })
+    .sort((a, b) => b.max - a.max)
+    .slice(0, 10);
+
+  if (!matches.length) {
+    document.getElementById('q4-result').innerHTML = '<p style="color:var(--muted)">No data for this date.</p>';
+    return;
+  }
+
+  const rows = matches.map((r, i) => {
+    const cls = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : '';
+    return `<tr class="${cls}">
+      <td>${i + 1}</td>
+      <td>${r.year}</td>
+      <td>${fmt(r.max)}°F</td>
+      <td>${fmt(r.min)}°F</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('q4-result').innerHTML = `
+    <table>
+      <thead><tr><th>Rank</th><th>Year</th><th>Max Temp</th><th>Min Temp</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function renderQ5() {
+  const aprilMaxes = dailyData
+    .filter(d => d.month === 4 && d.year <= 2025)
+    .map(d => d.max);
+
+  const m  = mean(aprilMaxes);
+  const sd = stdDev(aprilMaxes, m);
+  const target = 93;
+  const z = (target - m) / sd;
+  const pctBelow = aprilMaxes.filter(v => v < target).length / aprilMaxes.length * 100;
+  const daysAbove = aprilMaxes.filter(v => v >= target).length;
+
+  document.getElementById('q5-result').innerHTML = `
+    <div class="z-score-block">
+      <div class="z-stat">
+        <span class="val">${fmt(m)}°F</span>
+        <span class="lbl">April historical avg high (1975–2025)</span>
+      </div>
+      <div class="z-stat">
+        <span class="val">${fmt(sd)}°F</span>
+        <span class="lbl">Standard deviation</span>
+      </div>
+      <div class="z-stat">
+        <span class="val">+${fmt(z)}σ</span>
+        <span class="lbl">Z-score for 93°F</span>
+      </div>
+      <div class="z-stat">
+        <span class="val">${fmt(pctBelow)}%</span>
+        <span class="lbl">Of April days it exceeded</span>
+      </div>
+      <div class="z-stat">
+        <span class="val">${daysAbove}</span>
+        <span class="lbl">Days ≥ 93°F in past 50 Aprils</span>
+      </div>
+    </div>
+    <div class="highlight" style="margin-top:16px">
+      April's historical average high is <strong>${fmt(m)}°F</strong> (σ = ${fmt(sd)}°F).
+      93°F is <strong>+${fmt(z)}σ</strong> above average — more extreme than
+      <em>${fmt(pctBelow)}%</em> of all April days on record since 1975.
+      Only <strong>${daysAbove} day${daysAbove !== 1 ? 's' : ''}</strong> in the past 50 Aprils reached or exceeded 93°F.
+    </div>`;
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+(async () => {
+  const statusEl = document.getElementById('status');
+  try {
+    await fetchData();
+
+    // Hide spinner
+    statusEl.style.display = 'none';
+
+    // Set default date picker to today (or May 1 if no data)
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    const picker = document.getElementById('datePicker');
+    picker.value = todayStr;
+    picker.addEventListener('change', e => renderQ4(e.target.value));
+
+    // Show sections
+    document.getElementById('chart-section').style.display = 'block';
+    document.getElementById('analysis-section').style.display = 'block';
+
+    // Render chart
+    renderChart('yearly');
+
+    // Render all analysis
+    renderQ1();
+    renderQ2();
+    renderQ3();
+    renderQ4(todayStr);
+    renderQ5();
+
+  } catch (err) {
+    statusEl.innerHTML = `<div class="error-msg">
+      Failed to load temperature data: ${err.message}<br/>
+      <small>Check your connection or try refreshing the page.</small>
+    </div>`;
+  }
+})();
+</script>
+
+</body>
+</html>
