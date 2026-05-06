@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Washington DC Temperature History 1975–2026</title>
+<title>Washington DC Temperature History 1975–2025</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
@@ -305,7 +305,7 @@
 
 <header>
   <h1>Washington DC Temperature History</h1>
-  <p>1975 – 2026 &nbsp;·&nbsp; Daily high/low data from Open-Meteo Historical Archive</p>
+  <p>1975 – 2025 &nbsp;·&nbsp; Daily high/low data from Open-Meteo Historical Archive</p>
 </header>
 
 <main>
@@ -445,7 +445,7 @@ function fmt(n, dec = 1) { return n.toFixed(dec); }
 async function fetchData() {
   const url = 'https://archive-api.open-meteo.com/v1/archive' +
     '?latitude=38.9072&longitude=-77.0369' +
-    '&start_date=1975-01-01&end_date=2026-04-30' +
+    '&start_date=1975-01-01&end_date=2025-12-31' +
     '&daily=temperature_2m_max,temperature_2m_min' +
     '&temperature_unit=fahrenheit' +
     '&timezone=America%2FNew_York';
