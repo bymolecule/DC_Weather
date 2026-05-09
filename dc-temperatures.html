@@ -337,13 +337,19 @@
 
     <!-- Q1 -->
     <div class="card">
-      <h2>Q1 — Have average temperatures changed?</h2>
+      <h2>Q1 — How much have average temperatures changed in the past 50 years in DC?</h2>
       <div id="q1-result" class="highlight"></div>
+    </div>
+
+    <!-- Q-scorching -->
+    <div class="card">
+      <h2>Q2 — 90°F+ days per year: how many scorching days are we getting vs. the 1970s?</h2>
+      <div id="q-scorching-result"></div>
     </div>
 
     <!-- Q2 -->
     <div class="card">
-      <h2>Q2 — How did temperatures change over time?</h2>
+      <h2>Q3 — How did temperatures change over time?</h2>
       <div id="q2-result"></div>
     </div>
 
@@ -697,21 +703,77 @@ function renderQ1() {
   const avgs  = years.map(y => byYear[y].avg);
   const { slope } = linReg(years, avgs);
   const decadeChange = slope * 10;
+  const totalChange  = slope * (years[years.length - 1] - years[0]);
 
-  const early = avgs.slice(0, 10);
-  const late  = avgs.slice(-10);
-  const earlyMean = mean(early);
-  const lateMean  = mean(late);
+  const earlyYears = years.slice(0, 10);
+  const lateYears  = years.slice(-10);
+  const earlyMean  = mean(earlyYears.map(y => byYear[y].avg));
+  const lateMean   = mean(lateYears.map(y => byYear[y].avg));
+  const netChange  = lateMean - earlyMean;
 
-  let html;
-  if (Math.abs(decadeChange) < 0.05) {
-    html = 'No statistically significant change detected over the 50-year period.';
-  } else {
-    const dir = decadeChange > 0 ? 'risen' : 'fallen';
-    html = `Yes — DC's average annual temperature has <strong>${dir} by ${fmt(Math.abs(decadeChange))}°F per decade</strong> since 1975
-      (from <em>${fmt(earlyMean)}°F</em> in the late 1970s to <em>${fmt(lateMean)}°F</em> in the early 2020s).`;
-  }
-  document.getElementById('q1-result').innerHTML = html;
+  const dir = netChange >= 0 ? 'warmer' : 'cooler';
+  const sign = netChange >= 0 ? '+' : '';
+
+  document.getElementById('q1-result').innerHTML = `
+    DC's average annual temperature is <strong>${sign}${fmt(netChange)}°F ${dir}</strong> today than it was 50 years ago —
+    rising from <em>${fmt(earlyMean)}°F</em> (average of 1975–1984) to <em>${fmt(lateMean)}°F</em> (average of 2016–2025).
+    That works out to roughly <strong>${fmt(Math.abs(decadeChange))}°F of warming per decade</strong>,
+    or <strong>${fmt(Math.abs(totalChange))}°F total</strong> across the full period.`;
+}
+
+function renderScorching() {
+  const threshold = 90;
+  const hotByYear = {};
+  dailyData.forEach(d => {
+    if (!hotByYear[d.year]) hotByYear[d.year] = 0;
+    if (d.max >= threshold) hotByYear[d.year]++;
+  });
+
+  const years = Object.keys(hotByYear).map(Number).sort();
+  const counts = years.map(y => hotByYear[y]);
+
+  const decade = (y) => Math.floor(y / 10) * 10;
+  const byDecade = {};
+  years.forEach((y, i) => {
+    const d = decade(y);
+    if (!byDecade[d]) byDecade[d] = [];
+    byDecade[d].push(counts[i]);
+  });
+
+  const seventiesAvg = mean(byDecade[1970] || []);
+  const recentAvg    = mean(byDecade[2020] || byDecade[2010] || []);
+  const diff = recentAvg - seventiesAvg;
+  const sign = diff >= 0 ? '+' : '';
+
+  const maxCount = Math.max(...counts);
+  const maxYear  = years[counts.indexOf(maxCount)];
+
+  const decades = Object.keys(byDecade).map(Number).sort();
+  const decadeRows = decades.map(d => {
+    const label = d === 2020 ? '2020–2025' : `${d}s`;
+    return { label, avg: mean(byDecade[d]) };
+  }).sort((a, b) => b.avg - a.avg);
+
+  const rows = decadeRows.map(({ label, avg }) => {
+    const bar = '█'.repeat(Math.round(avg / 2));
+    return `<tr>
+      <td>${label}</td>
+      <td>${fmt(avg, 1)}</td>
+      <td style="font-family:monospace;letter-spacing:1px;color:var(--accent2)">${bar}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('q-scorching-result').innerHTML = `
+    <div class="highlight">
+      DC averaged <em>${fmt(seventiesAvg, 1)} days</em> above 90°F per year in the 1970s.
+      In 2020–2025 that's <em>${fmt(recentAvg, 1)} days</em> — a change of
+      <strong>${sign}${fmt(diff, 1)} days per year</strong>.
+      The record was <strong>${maxCount} scorching days in ${maxYear}</strong>.
+    </div>
+    <table>
+      <thead><tr><th>Decade</th><th>Avg 90°F+ days/yr</th><th></th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderQ2() {
@@ -891,6 +953,7 @@ function renderQ5() {
 
     // Render all analysis
     renderQ1();
+    renderScorching();
     renderQ2();
     renderQ3();
     renderQ4(todayStr);
